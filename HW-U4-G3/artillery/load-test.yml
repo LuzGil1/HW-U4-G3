@@ -1,0 +1,56 @@
+config:
+  target: "http://localhost:8080"
+  phases:
+    - duration: 30
+      arrivalRate: 10
+      name: "Warmup"
+    - duration: 120
+      arrivalRate: 50
+      name: "Sustained load"
+    - duration: 30
+      arrivalRate: 150
+      name: "Peak load"
+    - duration: 30
+      arrivalRate: 10
+      name: "Cooldown"
+  defaults:
+    headers:
+      Content-Type: "application/json"
+  variables:
+    region:
+      - "Norte"
+      - "Sur"
+      - "Este"
+      - "Oeste"
+
+scenarios:
+  - name: "Carga mixta OLTP"
+    weight: 70
+    flow:
+      - post:
+          url: "/pedidos"
+          json:
+            cliente_id: "{{ $randomInt(1, 500000) }}"
+            producto_id: "{{ $randomInt(1, 10000) }}"
+            categoria_id: "{{ $randomInt(1, 50) }}"
+            region: "{{ region }}"
+            cantidad: "{{ $randomInt(1, 10) }}"
+            precio_unit: "{{ $randomNumber(5, 500) }}"
+            canal: "web"
+          capture:
+            - json: "$.id"
+              as: "pedidoId"
+      - get:
+          url: "/pedidos/{{ pedidoId }}"
+      - put:
+          url: "/pedidos/{{ pedidoId }}/status"
+          json:
+            status: "completed"
+
+  - name: "Consulta analitica resumen"
+    weight: 30
+    flow:
+      - get:
+          url: "/pedidos/resumen?region={{ region }}"
+      - get:
+          url: "/pedidos?region={{ region }}&status=completed"
